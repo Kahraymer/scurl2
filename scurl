@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#anity check, run this line if scurl is in the current directory:
+#sanity check, run this line if scurl is in the current directory:
 # /usr/class/cs255/bin/sanity/sanity $PWD/scurl
 
 """
@@ -42,8 +42,8 @@ flagmap = {
 	"--ciphers": False,
 	"--crlfile": False,
 	"--cacert": False,
-	"--allow-stale-certs": False,
-	"pinnedcertificate": False}
+	"--allow-stale-certs": 0,
+	"--pinnedcertificate": False}
 
 def verify_cipher_args(args):
 	#DO WE ONLY NEED THIS TO WORK FOR CORN CIPHERS?????
@@ -59,7 +59,7 @@ def verify_cipher_args(args):
 
 
 def parse_args():
-	global tls_map, tls_version
+	global tls_map, tls_version, url_object
 
 	#print 'Number of arguments:', len(sys.argv), 'arguments.'
 	#print 'Argument List:', str(sys.argv)
@@ -101,8 +101,7 @@ def parse_args():
 
 		elif(sys.argv[i]=='--allow-stale-certs'):
 			if(i+1 < len(sys.argv) and sys.argv[i+1].isdigit() and sys.argv[i+1]>=0):
-				print 'allow stale certs by ' + sys.argv[i+1] + ' days'
-				flagmap["--allow-stale-certs"]= sys.argv[i+1]
+				flagmap["--allow-stale-certs"]= int(sys.argv[i+1])
 				i=i+2
 				continue
 			else:
@@ -118,9 +117,11 @@ def parse_args():
 			else:
 				sys.stderr.write( "scurl: try 'scurl --help' or 'scurl --manual' for more information")
 				exit(1)
-		elif not (parse_url(sys.argv[i])):
-			sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
-			exit(1)
+		else:
+			url_object = parse_url(sys.argv[i])
+			if url_object is False:
+				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				exit(1)
 
 		i=i+1
 	#print flagmap
@@ -129,7 +130,7 @@ def parse_args():
 
 
 def cb_func(conn, cert, errno, errdepth, ok):
-	global url_object
+	global url_object, flagmap
 
 	# Checking name on leaf certificate (doesn't work)
 
@@ -171,21 +172,17 @@ def cb_func(conn, cert, errno, errdepth, ok):
 			# print "Certificate name doesn't match host"
 			# return False
 
-	if (errno == 9 or errno == 10):
-		# print "Not in valid time"
-		return False
-	# else:
-		# print "Valid time"
-
-	# start_date = int(cert.get_notBefore()[:-1])
-	# exp_date = int(cert.get_notAfter()[:-1])
-	# now = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
-	# if not (start_date < now < exp_date):
-	# 	print "Not in valid time"
-	# 	# THROW ERROR HERE!
-	# 	return False
-	# else:
-	# 	print "Valid time :)"
+	if (flagmap['--allow-stale-certs'] > 0):
+		numdays = flagmap['--allow-stale-certs']
+		
+		if (errno == 10):
+			exp_date = datetime.datetime.strptime(cert.get_notAfter()[:-1],"%Y%m%d%H%M%S")
+			exp_date = exp_date + datetime.timedelta(days=numdays)
+			now = datetime.datetime.utcnow()
+			if now < exp_date:
+				return True
+			else:
+				return ok
 
 	return ok
 
@@ -200,7 +197,7 @@ url_object = {
 Returns none if invalid url type
 """
 def parse_url(url):
-	global url_object	
+	#global url_object	
 	#print url
 	if url.startswith('//'):
 		url = 'https:' + url
@@ -232,7 +229,7 @@ def parse_url(url):
 	else:
 		return False
 	#print url_object
-	return True
+	return url_object
 
 """
 Sets up the socket, context, and connection.
@@ -246,6 +243,7 @@ def establish_connection(url_obj):
 	myContext = SSL.Context(tls_version)
 	if(flagmap['--ciphers'] != False):
 		myContext.set_cipher_list(flagmap['--ciphers'].decode('utf-8'))
+	myContext.set_verify(SSL.VERIFY_PEER|SSL.VERIFY_FAIL_IF_NO_PEER_CERT, cb_func)
 	myContext.set_default_verify_paths()
 	
 	"""
@@ -299,7 +297,7 @@ def main():
 		while True:
 			r = myConnection.recv(numBytes)
 			t1.append(r)
-			if len(r) < numBytes and "</html>" in r:
+			if "</html>" in r: # and len(r) < numBytes
 				# print "DONE getting HTML"
 				break
 	except (SSL.ZeroReturnError, SSL.Error):
@@ -314,6 +312,8 @@ def main():
 	html_body_index = html_string.find('<!DOCTYPE html>')
 	if html_body_index == -1:
 		html_body_index = html_string.find('<!doctype html>')
+	if html_body_index == -1:
+		html_body_index = html_string.find('<html>')
 	html_body = html_string[html_body_index:]
 	end_tag = '</html>'
 	end_index = html_body.find(end_tag)
@@ -323,4 +323,5 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
 
