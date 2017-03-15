@@ -144,9 +144,9 @@ def cb_func(conn, cert, errno, errdepth, ok):
 
 	#print errno
 
-	if errno == 20:
-		sys.stderr.write("ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY\n")
-		return False
+	#if errno == 20:
+		#sys.stderr.write("ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY\n")
+		#return False
 		#exit(1)
 
 	if errdepth == 0:
@@ -288,7 +288,7 @@ def main():
 	try:
 		myConnection.do_handshake()
 	except (SSL.ZeroReturnError, SSL.Error):
-		# print "Invalid certificate"
+		sys.stderr.write('HANDSHAKE ERROR\n')
 		exit(1)
 
 	# print "Connection established"
