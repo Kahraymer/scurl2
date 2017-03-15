@@ -143,26 +143,35 @@ def cb_func(conn, cert, errno, errdepth, ok):
 	is fine while www.*.com or even *.*.* is not allowed but accepted by your code.
 	"""
 
-	#print errno
+	# print errno
 
 	#if errno == 20:
 		#sys.stderr.write("ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY\n")
 		#return False
 		#exit(1)
-
-	if errdepth == 0:
+	#print errno
+	if errdepth == 0 and errno == 0:
 		
 		pattern = copy.deepcopy(cert.get_subject().commonName)
-		
+		x=cert.get_extension_count()
+
+		# Catching alternative names		
+		for i in xrange(x):
+			if (cert.get_extension(i).get_short_name() == "subjectAltName"):
+				names_string = str(cert.get_extension(i))
+				names_list = names_string.replace("DNS:",'').split(',')
+				names_list = [name.lstrip() for name in names_list]
+				if url_object['common_name'] in names_list:
+					return True
 		num_dots1 = cert.get_subject().commonName.count('.')
 		num_dots2 = url_object['common_name'].count('.')
 		if num_dots1 != num_dots2:
 			# An exception for wildcards. *.google.com should be accepted by google.com
-			if not ((cert.get_subject().commonName[:2] == '*.') and (cert.get_subject().commonName[2:] == url_object['common_name'])):
+			#if not ((cert.get_subject().commonName[:2] == '*.') and (cert.get_subject().commonName[2:] == url_object['common_name'])):
 
 
-				# Wildcard character introduced new periods, which isn't allowed
-				return False
+			# Wildcard character introduced new periods, which isn't allowed
+			return False
 		if pattern.rfind('*') > pattern.find('.'):
 			# Asterisk not in left section
 			return False
@@ -287,6 +296,7 @@ def main():
 
 	myConnection = establish_connection(url_object)
 	if myConnection is None:
+		sys.stderr.write("Couldn't establish connection")
 		# print "Couldn't establish connection ???? "
 		exit(1)
 
@@ -305,7 +315,7 @@ def main():
 	# The browser checks that the certificate was issued by a trusted party 
 	# (usually a trusted root CA), that the certificate is still valid and 
 	# that the certificate is related to the site contacted.
-	myConnection.sendall("GET " + url_object['path'] + " HTTP/1.1\r\nHost: " + url_object['common_name'] + "\r\nUser-Agent: Tom and Ben\r\n\r\n") # HTTP/1.1
+	myConnection.sendall("GET " + url_object['path'] + " HTTP/1.1\r\nHost: " + url_object['common_name'] + "\r\nUser-Agent: Tom and Ben\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n\r\n") # HTTP/1.1
 
 	t1 = []
 	try:
@@ -325,9 +335,9 @@ def main():
 	myConnection.close()
 	html_string = "".join(t1)
 	# print html_string
-	html_body_index = html_string.find('<!DOCTYPE html>')
+	html_body_index = html_string.find('<!DOCTYPE html')
 	if html_body_index == -1:
-		html_body_index = html_string.find('<!doctype html>')
+		html_body_index = html_string.find('<!doctype html')
 	if html_body_index == -1:
 		html_body_index = html_string.find('<html>')
 	html_body = html_string[html_body_index:]
@@ -339,5 +349,6 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
 
 
