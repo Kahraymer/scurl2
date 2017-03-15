@@ -44,7 +44,6 @@ flagmap = {
 	"--cacert": False,
 	"--allow-stale-certs": 0,
 	"--pinnedcertificate": False}
-	
 
 def verify_cipher_args(args):
 	#DO WE ONLY NEED THIS TO WORK FOR CORN CIPHERS?????
@@ -63,6 +62,7 @@ def parse_args():
 	global tls_map, tls_version, url_object
 
 	#print 'Number of arguments:', len(sys.argv), 'arguments.'
+	
 	#print 'Argument List:', str(sys.argv)
 	i = 1
 	while(i < len(sys.argv)):
@@ -76,7 +76,7 @@ def parse_args():
 				i=i+2
 				continue
 			else:
-				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
 				exit(1)
 
 		elif(sys.argv[i]=='--crlfile'):
@@ -86,7 +86,7 @@ def parse_args():
 				i=i+2
 				continue
 			else:
-				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
 				exit(1)
 
 
@@ -97,7 +97,7 @@ def parse_args():
 				i=i+2
 				continue
 			else:
-				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
 				exit(1)
 
 		elif(sys.argv[i]=='--allow-stale-certs'):
@@ -106,7 +106,7 @@ def parse_args():
 				i=i+2
 				continue
 			else:
-				sys.stderr.write('--allow-stale-certs invalid N')
+				sys.stderr.write('--allow-stale-certs invalid N\n')
 				exit(1)
 
 		elif(sys.argv[i]=='--ciphers'):
@@ -116,12 +116,12 @@ def parse_args():
 				i=i+2
 				continue
 			else:
-				sys.stderr.write( "scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				sys.stderr.write( "scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
 				exit(1)
 		else:
 			url_object = parse_url(sys.argv[i])
 			if url_object is False:
-				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information")
+				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
 				exit(1)
 
 		i=i+1
@@ -141,6 +141,13 @@ def cb_func(conn, cert, errno, errdepth, ok):
 	wildcards should only be allowed in the leftmost label: *.example.com 
 	is fine while www.*.com or even *.*.* is not allowed but accepted by your code.
 	"""
+
+	#print errno
+
+	if errno == 20:
+		sys.stderr.write("ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY\n")
+		return False
+		#exit(1)
 
 	if errdepth == 0:
 		
@@ -237,7 +244,7 @@ Sets up the socket, context, and connection.
 Returns a conenction object
 """
 def establish_connection(url_obj):
-	global tls_version
+	global tls_version, flagmap
 
 	# Setting up socket, context, and connection
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -245,7 +252,10 @@ def establish_connection(url_obj):
 	if(flagmap['--ciphers'] != False):
 		myContext.set_cipher_list(flagmap['--ciphers'].decode('utf-8'))
 	myContext.set_verify(SSL.VERIFY_PEER|SSL.VERIFY_FAIL_IF_NO_PEER_CERT, cb_func)
-	myContext.set_default_verify_paths()
+	if (flagmap['--cacert'] != False):
+		myContext.load_verify_locations(flagmap['--cacert'])
+	else:
+		myContext.set_default_verify_paths()
 	
 	"""
 	Context.set_cipher
