@@ -77,6 +77,7 @@ def parse_args():
 			#NEED TO CONFIRM FILE IS VALID
 			if(i+1 < len(sys.argv)):
 				flagmap['--cacert']= sys.argv[i+1]
+				flagmap['--pinnedcertificate']=False
 				i=i+2
 				continue
 			else:
@@ -87,6 +88,7 @@ def parse_args():
 			#NEED TO CONFIRM FILE IS VALID
 			if(i+1 < len(sys.argv)):
 				flagmap['--crlfile']=sys.argv[i+1]
+				flagmap['--pinnedcertificate']=False
 				i=i+2
 				continue
 			else:
@@ -99,6 +101,8 @@ def parse_args():
 			if(i+1 < len(sys.argv)):
 				flagmap['--pinnedcertificate']=sys.argv[i+1]
 				i=i+2
+				flagmap['--cacert']=False
+				flagmap['--crlfile']=False
 				continue
 			else:
 				sys.stderr.write("scurl: try 'scurl --help' or 'scurl --manual' for more information\n")
@@ -152,11 +156,30 @@ def cb_func(conn, cert, errno, errdepth, ok):
 		#sys.stderr.write("ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY\n")
 		#return False
 		#exit(1)
+
 	#print errno
 	if cert.get_serial_number() in revoked_serial_nums:
 		return False
 
+	#compare certs if --pinnedcertificate flag called
+	if(flagmap['--pinnedcertificate'] != False):
+		try:
+			if errdepth == 0:
+				#double check use md5???
+				if(cert.digest("sha1") == crypto.load_certificate(crypto.FILETYPE_PEM,flagmap['--pinnedcertificate']).digest("sha1")):
+					return True
+				else:
+					return False
+			else:
+				return True
+		except(crypto.Error):
+			return False
+
+
+
+
 	if errdepth == 0 and errno == 0:
+
 		
 		pattern = copy.deepcopy(cert.get_subject().commonName)
 		x=cert.get_extension_count()
@@ -293,6 +316,8 @@ def establish_connection(url_obj):
 	else:
 		myContext.set_default_verify_paths()
 	
+
+
 	"""
 	Context.set_cipher
 	"""
