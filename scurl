@@ -29,6 +29,7 @@ Things that are put on hold:
 catch unexpected EOF and treat them as 0 error
 """
 url_object = {}
+revoked_serial_nums = []
 tls_version = SSL.TLSv1_2_METHOD
 tls_map = {
 	"--tlsv1.0": SSL.TLSv1_METHOD,
@@ -134,7 +135,7 @@ def parse_args():
 
 
 def cb_func(conn, cert, errno, errdepth, ok):
-	global url_object, flagmap
+	global url_object, flagmap, revoked_serial_nums
 
 	# Checking name on leaf certificate (doesn't work)
 
@@ -152,6 +153,9 @@ def cb_func(conn, cert, errno, errdepth, ok):
 		#return False
 		#exit(1)
 	#print errno
+	if cert.get_serial_number() in revoked_serial_nums:
+		return False
+
 	if errdepth == 0 and errno == 0:
 		
 		pattern = copy.deepcopy(cert.get_subject().commonName)
@@ -256,7 +260,7 @@ Sets up the socket, context, and connection.
 Returns a conenction object
 """
 def establish_connection(url_obj):
-	global tls_version, flagmap
+	global tls_version, flagmap, revoked_serial_nums
 
 	# Setting up socket, context, and connection
 	try:
@@ -264,6 +268,17 @@ def establish_connection(url_obj):
 	except socket.error:
 		sys.stderr.write("Error creating socket\n")
 		exit(1)
+
+	if (flagmap['--crlfile'] != False):
+		try:
+			crl_file = open(flagmap['--crlfile'], 'rt').read()
+			crl = crypto.load_crl(crypto.FILETYPE_PEM, crl_file)
+			revocations = crl.get_revoked()
+			revoked_serial_nums = [int(rev.get_serial(),16) for rev in revocations]
+			#print revoked_serial_nums
+		except IOError:
+			sys.stderr.write("No such file or directory\n")
+			exit(1)
 
 	myContext = SSL.Context(tls_version)
 	if(flagmap['--ciphers'] != False):
@@ -342,7 +357,10 @@ def main():
 			if "</html>" in r: # and len(r) < numBytes
 				# print "DONE getting HTML"
 				break
-	except (SSL.ZeroReturnError, SSL.Error):
+	except (SSL.ZeroReturnError, SSL.Error, socket.error):
+		sys.stderr.write("Error receiving data\n")
+		exit(1)
+
 		pass
 
 
