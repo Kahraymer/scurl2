@@ -63,7 +63,9 @@ def parse_args():
 	global tls_map, tls_version, url_object
 
 	#print 'Number of arguments:', len(sys.argv), 'arguments.'
-	
+	if len(sys.argv) < 2:
+		sys.stderr.write("Not enough arguments\n")
+		exit(1)	
 	#print 'Argument List:', str(sys.argv)
 	i = 1
 	while(i < len(sys.argv)):
@@ -257,13 +259,18 @@ def establish_connection(url_obj):
 	global tls_version, flagmap
 
 	# Setting up socket, context, and connection
-	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	except socket.error:
+		sys.stderr.write("Error creating socket\n")
+		exit(1)
+
 	myContext = SSL.Context(tls_version)
 	if(flagmap['--ciphers'] != False):
 		try:
 			myContext.set_cipher_list(flagmap['--ciphers'].decode('utf-8'))
 		except(SSL.Error):
-			sys.stderr.write("invalid cipher\n")
+			sys.stderr.write("Invalid cipher\n")
 			exit(1)
 	myContext.set_verify(SSL.VERIFY_PEER|SSL.VERIFY_FAIL_IF_NO_PEER_CERT, cb_func)
 	if (flagmap['--cacert'] != False):
@@ -280,7 +287,12 @@ def establish_connection(url_obj):
 	myConnection.set_tlsext_host_name(url_obj['common_name'])
 	myConnection.set_connect_state()
 
-	myConnection.connect((url_obj['common_name'], url_obj['port']))
+	try:
+		myConnection.connect((url_obj['common_name'], url_obj['port']))
+	except socket.error, socket.gaierror:
+		sys.stderr.write("Couldn't connect to server\n")
+		exit(1)	
+
 
 	return myConnection
 
@@ -296,7 +308,7 @@ def main():
 
 	myConnection = establish_connection(url_object)
 	if myConnection is None:
-		sys.stderr.write("Couldn't establish connection")
+		sys.stderr.write("Couldn't establish connection\n")
 		# print "Couldn't establish connection ???? "
 		exit(1)
 
@@ -315,7 +327,11 @@ def main():
 	# The browser checks that the certificate was issued by a trusted party 
 	# (usually a trusted root CA), that the certificate is still valid and 
 	# that the certificate is related to the site contacted.
-	myConnection.sendall("GET " + url_object['path'] + " HTTP/1.1\r\nHost: " + url_object['common_name'] + "\r\nUser-Agent: Tom and Ben\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n\r\n") # HTTP/1.1
+	try:
+		myConnection.sendall("GET " + url_object['path'] + " HTTP/1.1\r\nHost: " + url_object['common_name'] + "\r\nUser-Agent: Tom and Ben\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n\r\n") # HTTP/1.1
+	except socket.error:
+		sys.stderr.write("Error sending data\n")
+		exit(1)
 
 	t1 = []
 	try:
