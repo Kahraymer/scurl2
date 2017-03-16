@@ -159,15 +159,14 @@ def cb_func(conn, cert, errno, errdepth, ok):
 		#exit(1)
 
 	#print errno
-	if cert.get_serial_number() in revoked_serial_nums:
-		return False
 
 	#compare certs if --pinnedcertificate flag called
 	if(flagmap['--pinnedcertificate'] != False):
 		try:
 			if errdepth == 0:
 				#double check use md5???
-				if(cert.digest("sha1") == crypto.load_certificate(crypto.FILETYPE_PEM,flagmap['--pinnedcertificate']).digest("sha1")):
+				pinfile = open(flagmap['--pinnedcertificate'], 'rt').read()
+				if(cert.digest("sha256") == crypto.load_certificate(crypto.FILETYPE_PEM,pinfile).digest("sha256")):
 					return True
 				else:
 					return False
@@ -176,7 +175,8 @@ def cb_func(conn, cert, errno, errdepth, ok):
 		except(crypto.Error):
 			return False
 
-
+	if cert.get_serial_number() in revoked_serial_nums:
+		return False
 
 
 	if errdepth == 0 and errno == 0:
@@ -377,7 +377,7 @@ def main():
 
 	try:
 		myConnection.do_handshake()
-	except (SSL.ZeroReturnError, SSL.Error):
+	except (SSL.ZeroReturnError, SSL.Error, IOError):
 		sys.stderr.write('HANDSHAKE ERROR\n')
 		exit(1)
 
