@@ -36,6 +36,7 @@ tls_map = {
 	"--tlsv1.1": SSL.TLSv1_1_METHOD,
 	"--tlsv1.2": SSL.TLSv1_2_METHOD,
 	"--sslv3": SSL.SSLv3_METHOD,
+	"-3": SSL.SSLv3_METHOD
 }
 
 
@@ -379,13 +380,13 @@ def main():
 		while True:
 			r = myConnection.recv(numBytes)
 			t1.append(r)
-			if "</html>" in r: # and len(r) < numBytes
+			if "</html>" in r or "</HTML>" in r: # and len(r) < numBytes
 				# print "DONE getting HTML"
 				break
 	except (SSL.ZeroReturnError, SSL.Error, socket.error):
 		sys.stderr.write("Error receiving data\n")
 		exit(1)
-
+	except EOFError:
 		pass
 
 
@@ -399,9 +400,20 @@ def main():
 		html_body_index = html_string.find('<!doctype html')
 	if html_body_index == -1:
 		html_body_index = html_string.find('<html>')
+	if html_body_index == -1:
+		html_body_index = html_string.find('<HTML>')
+	if html_body_index == -1:
+		sys.stderr.write("Malformed html file")
+		exit(1)
 	html_body = html_string[html_body_index:]
 	end_tag = '</html>'
 	end_index = html_body.find(end_tag)
+	if end_index == -1:
+		end_tag = '</HTML>'
+		end_index = html_body.find(end_tag)
+	if end_index == -1:
+		sys.stderr.write("Malformed html file")
+		exit(1)
 	html_body = html_body[:end_index+len(end_tag)]
 	print html_body
 	exit(0)
